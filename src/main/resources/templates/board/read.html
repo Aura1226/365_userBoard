@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<th:block th:replace="~{/layout/basic :: setContent(~{this::content} )}">
+
+    <th:block th:fragment="content">
+
+        <h1 class="mt-4">Board Read Page</h1>
+
+        <div class="form-group">
+            <label >Bno</label>
+            <input type="text" class="form-control" name="gno" th:value="${dto.bno}" readonly >
+        </div>
+
+        <div class="form-group">
+            <label >Title</label>
+            <input type="text" class="form-control" name="title" th:value="${dto.title}" readonly >
+        </div>
+        <div class="form-group">
+            <label >Content</label>
+            <textarea class="form-control" rows="5" name="content" readonly>[[${dto.content}]]</textarea>
+        </div>
+        <div class="form-group">
+            <label >Writer</label>
+            <input type="text" class="form-control" name="writer" th:value="${dto.writerName}" readonly>
+        </div>
+        <div class="form-group">
+            <label >RegDate</label>
+            <input type="text" class="form-control" name="regDate" th:value="${#temporals.format(dto.regDate, 'yyyy/MM/dd HH:mm:ss')}" readonly>
+        </div>
+        <div class="form-group">
+            <label >ModDate</label>
+            <input type="text" class="form-control" name="modDate" th:value="${#temporals.format(dto.modDate, 'yyyy/MM/dd HH:mm:ss')}" readonly>
+        </div>
+
+        <a th:href="@{/board/modify(bno = ${dto.bno}, page=${requestDTO.page}, type=${requestDTO.type}, keyword =${requestDTO.keyword})}">
+            <button type="button" class="btn btn-primary">Modify</button>
+        </a>
+
+        <a th:href="@{/board/list(page=${requestDTO.page} , type=${requestDTO.type}, keyword =${requestDTO.keyword})}">
+            <button type="button" class="btn btn-info">List</button>
+        </a>
+
+        <div >
+            <div class="mt-4">
+                <h5 ><span class="badge badge-info addReply">Add Reply</span> </h5>
+                <h5 ><span class="badge badge-secondary replyCount"> Reply Count  [[${dto.replyCount}]]</span> </h5>
+            </div>
+            <div class="list-group replyList">
+
+            </div>
+        </div>
+
+
+        <div class="modal" tabindex="-1" role="dialog">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Modal title</h5>
+
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <input class="form-control"  type="text" name="replyText" placeholder="Reply Text...">
+                        </div>
+                        <div class="form-group">
+                            <input class="form-control"  type="text" name="replyer" placeholder="Replyer">
+                            <input type="hidden" name="rno" >
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-danger replyRemove">Remove</button>
+                        <button type="button" class="btn btn-warning replyModify">Modify</button>
+                        <button type="button" class="btn btn-primary replySave">Save</button>
+                        <button type="button" class="btn btn-outline-secondary replyClose" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+        <script th:inline="javascript">
+
+            const bno = [[${dto.bno}]]
+
+            //댓글이 추가될 영역
+            const listGroup  = $(".replyList");
+
+            function removeReply(rno, text, replyer){
+
+
+                $("input[name='replyText']").val( text );
+                $("input[name='replyer']").val( replyer);
+                $("input[name='rno']").val(rno);
+
+                $(".modal-footer .btn").hide();
+                $(".replyRemove, .replyModify, .replyClose").show();
+
+                modal.modal('show');
+
+            }
+
+            $(".replyRemodEsve").click(function() {
+
+                const rno = $("input[name='rno']").val();
+
+                //alert(rno);
+
+                const result = axios.delete('/replies/'+rno)
+                result.then(() => {
+                    alert("댓글 삭제 실패");
+                    modal.modal("hide")
+                    getList()
+                })
+            });
+
+            $(".replyModify").click(function() {
+                const rno = $("input[name='rno']").val();
+                const text = $("input[name='replyText']").val();
+                const replyer = $("input[name='replyer']").val();
+
+                const reply = {rno, bno, text, replyer};
+
+                const result = axios.put("/replies/"+rno, reply)
+                    .then(() => {
+                        alert("댓글 수정 완료")
+                        modal.modal("hide")
+                        getList()
+                    })
+
+            })
+
+            //날짜 처리를 위한 함수
+            function formatTime(str){
+                var date = new Date(str);
+
+                return date.getFullYear() + '/' +
+                    (date.getMonth() + 1) + '/' +
+                    date.getDate() + ' ' +
+                    date.getHours() + ':' +
+                    date.getMinutes();
+            }
+
+            function getList(){
+                const result = axios.get("/replies/board/"+bno);
+
+                result.then(res => {
+                    console.log(res.data)
+                    const arr = res.data
+                    let str ="";
+
+                    $('.replyCount').html(" Reply Count  " + arr.length);
+
+                    $.each(arr, function(idx, reply){
+                        console.log(reply);
+                        str += '    <div class="card-body" onclick="removeReply('+reply.rno+',\''+reply.text+'\',\''+reply.replyer+'\')" data-rno="'+reply.rno+'"><b>'+reply.rno +'</b>';
+                        str += '    <h5 class="card-title">'+reply.text+'</h5>';
+                        str += '    <h6 class="card-subtitle mb-2 text-muted">'+reply.replyer+'</h6>';
+                        str += '    <p class="card-text">'+ formatTime(reply.regDate) +'</p>';
+                        str += '    </div>';
+                    })
+                    console.log(str)
+
+                    listGroup.html(str)
+                })//then
+            }
+
+
+            $(".replyCount").click(function() {
+                getList()
+            })
+
+            //모달 창
+            const modal = $('.modal');
+
+            $(".addReply").click(function () {
+
+                modal.modal('show');
+
+                //댓글 입력하는 부분 초기화 시키기
+                $('input[name="replyText"]').val('');
+                $('input[name="replyer"]').val('');
+
+
+                $(".modal-footer .btn").hide(); //모달 내의 모든 버튼을 안 보이도록
+                $(".replySave, .replyClose").show(); //필요한 버튼들만 보이도록
+
+            });
+
+            $(".replySave").click(function() {
+
+                const reply = {
+                    bno: bno,
+                    text: $('input[name="replyText"]').val(),
+                    replyer: $('input[name="replyer"]').val()
+                }
+                console.log(reply);
+
+                async function sendPost(){
+                    const result = await axios.post("/replies/", reply)
+                    return result.data
+                }
+                sendPost().then(value => {
+                    alert(value)
+                    modal.modal('hide');
+                    getList()
+                })
+            });
+
+        </script>
+
+
+    </th:block>
+
+</th:block>
